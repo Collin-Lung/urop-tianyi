@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn_extra.cluster import KMedoids
 from sklearn.decomposition import PCA
+from scipy.spatial import ConvexHull
 import pandas as pd
 
 # Opening and cleaning the data
@@ -70,11 +71,22 @@ def k_medoids_loss(data, medoids, labels):
 loss = k_medoids_loss(p5_pca, medoids, labels)
 print(f"Loss: {loss}")
 
+fig, ax = plt.subplots()
 plt.scatter(p5_pca[:, 0], p5_pca[:, 1], c=labels, s=10, alpha=.50)
 plt.scatter(medoid_coords[:, 0], medoid_coords[:, 1], marker='x', s=25, linewidths=1, color='black')
 plt.xlabel("PC1", fontsize=16)
 plt.ylabel("PC2", fontsize=16)
 plt.title('K-medoids Clustering with PCA', fontsize=23)
+
+# Compute and plot boundaries for each medoid cluster
+for medoid_index in medoids:
+    medoid_label = labels[medoid_index]
+    cluster_points = p5_pca[labels == medoid_label]
+    hull = ConvexHull(cluster_points)
+    boundary_points = cluster_points[hull.vertices]
+    boundary_points = np.append(boundary_points, [boundary_points[0]], axis=0)
+    ax.plot(boundary_points[:, 0], boundary_points[:, 1], color='black', linewidth=2)
+
 
 # Get the avg mma_rgi for each sequence
 avg_mma_rgi_list = []
