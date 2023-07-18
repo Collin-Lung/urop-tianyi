@@ -34,6 +34,7 @@ os.chdir(folder)
 subprocess.run(["cp", "/pool/tianyi/Backbone_p5_M/includes/*", "."])
 os.environ["AMBERHOME"] = "/pool/shared/amber18"
 
+#Load tleap and the initial parm file
 with open(f"tleap_{title}_pre.in", "w") as file:
     file.write(
         f"""\
@@ -53,6 +54,7 @@ quit
     )
 subprocess.run(["tleap", "-s", "-f", f"tleap_{title}_pre.in"], stdout=subprocess.PIPE)
 
+#Rotate the RHP so that the longest PCA is aligned, reduces the size of the box.
 with open(f"rotate_{title}_pre.in", "w") as file:
     file.write(
         f"""\
@@ -150,6 +152,7 @@ mpirun -np 8 -mca btl ^openib $AMBERHOME/bin/pmemd.MPI -O -i min_igb.in -o {titl
 """
     )
 
+# Open the launch equilibrium production
 with open("launch_EqProd_1.sh", "w") as file:
     file.write(
         f"""\
@@ -168,6 +171,7 @@ $AMBERHOME/bin/pmemd.cuda -O -i {title}_production_1.in -o {title}_production_1.
 """
     )
 
+# Launch the anneal cycle
 with open("launch_anneal.sh", "w") as file:
     file.write(
         f"""\

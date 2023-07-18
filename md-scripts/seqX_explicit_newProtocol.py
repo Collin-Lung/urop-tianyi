@@ -54,9 +54,11 @@ subprocess.run(["cp", "production.in", f"{title}_production1_exp.in"])
 subprocess.run(["cp", "production.in", f"{title}_production2_exp.in"])
 
 # Modify input files
+# eq
 subprocess.run(["sed", "-i", "-e", f"s/TEMPERATURE/{eqT}/g", f"{title}_nvt_heat_exp.in"])
 subprocess.run(["sed", "-i", "-e", f"s/TEMPERATURE/{eqT}/g", f"{title}_eq_exp.in"])
 subprocess.run(["sed", "-i", "-e", f"s/NSTEPS/{nstepsEq}/g", f"{title}_eq_exp.in"])
+# quickanneal
 subprocess.run(["sed", "-i", "-e", f"s/NSTEPS/{nsteps1}/g", f"{title}_nvt_t1t2_exp_12.in"])
 subprocess.run(["sed", "-i", "-e", f"s/T1/{T1}/g", f"{title}_nvt_t1t2_exp_12.in"])
 subprocess.run(["sed", "-i", "-e", f"s/T2/{T2}/g", f"{title}_nvt_t1t2_exp_12.in"])
@@ -66,6 +68,7 @@ subprocess.run(["sed", "-i", "-e", f"s/T2/{T3}/g", f"{title}_nvt_t1t2_exp_23.in"
 subprocess.run(["sed", "-i", "-e", f"s/NSTEPS/{nsteps3}/g", f"{title}_nvt_t1t2_exp_34.in"])
 subprocess.run(["sed", "-i", "-e", f"s/T1/{T3}/g", f"{title}_nvt_t1t2_exp_34.in"])
 subprocess.run(["sed", "-i", "-e", f"s/T2/{T4}/g", f"{title}_nvt_t1t2_exp_34.in"])
+# production
 subprocess.run(["sed", "-i", "-e", f"s/TEMPERATURE/{prodT}/g", f"{title}_production1_exp.in"])
 subprocess.run(["sed", "-i", "-e", f"s/NSTEPS/{nstepsProd1}/g", f"{title}_production1_exp.in"])
 subprocess.run(["sed", "-i", "-e", f"s/TEMPERATURE/{prodT}/g", f"{title}_production2_exp.in"])
@@ -155,5 +158,113 @@ for i in range(1, 11):
     subprocess.run(
         ["$AMBERHOME/bin/parmed", "-i", f"adjustwaters_{title}_{i}.in", ">", f"adjustwaters_{title}_{i}.out"])
 
-    #Launch scripts:
+    # Launch script: launch_min_${i}.sh
+    with open(f"launch_min_{i}.sh", "w") as file:
+        file.write(f"""#!/bin/bash
+    #SBATCH -J {title}_min_{i}
+    #SBATCH -o {title}_slurmoutput_min_{i}.out
+    #SBATCH -N 1
+    #SBATCH -n 8
+    #SBATCH -p regular-cpu
+    export AMBERHOME=/pool/shared/amber18
+    source /pool/shared/amber18/amber.sh
+    mpirun -np 8 -mca btl ^openib /pool/shared/amber18/bin/pmemd.MPI -O -i min.in -o {title}_min_exp_{i}.out -p {title}_exp_{i}.parm7 -c {title}_exp_{i}.rst7 -r {title}_min_exp_{i}.rst -inf min_{i}inf
+    mpirun -np 8 -mca btl ^openib /pool/shared/amber18/bin/pmemd.MPI -O -i {title}_nvt_heat_exp.in -o {title}_nvt_heat_exp_{i}.out -p {title}_exp_{i}.parm7 -c {title}_min_exp_{i}.rst -r {title}_nvt_heat_exp_{i}.rst -x {title}_nvt_heat_exp_{i}.nc -inf nvtheat_{i}info
+    mpirun -np 8 -mca btl ^openib /pool/shared/amber18/bin/pmemd.MPI -O -i {title}_eq_exp.in -o {title}_eq_exp_{i}.out -p {title}_exp_{i}.parm7 -c {title}_nvt_heat_exp_{i}.rst -r {title}_eq_exp_{i}.rst -x {title}_eq_exp_{i}.nc -inf eq_{i}inf
+    INPUT\n""")
 
+    # Launch script: launch_anneal12_${i}.sh
+    with open(f"launch_anneal12_{i}.sh", "w") as file:
+        file.write(f"""#!/bin/bash
+    #SBATCH -J {title}_anneal12_{i}
+    #SBATCH -o {title}_slurmoutput_anneal12_{i}.out
+    #SBATCH -N 1
+    #SBATCH -n 1
+    #SBATCH --gres=gpu:volta:1
+    export AMBERHOME=/home/gridsan/tjin/amber18
+    source /home/gridsan/tjin/amber18/amber.sh
+    export CUDA_HOME=/usr/local/pkg/cuda/cuda-10.1
+    /home/gridsan/tjin/amber18/bin/pmemd.cuda -O -i {title}_nvt_t1t2_exp_12.in -o {title}_nvt_t1t2_exp_12_{i}.out -p {title}_exp_{i}.parm7 -c {title}_eq_exp_{i}.rst -r {title}_nvt_t1t2_exp_12_{i}.rst -x {title}_nvt_t1t2_exp_12_{i}.nc -inf nvtanneal12_{i}inf
+    INPUT\n""")
+
+    # Launch script: launch_anneal23_${i}.sh
+    with open(f"launch_anneal23_{i}.sh", "w") as file:
+        file.write(f"""#!/bin/bash
+    #SBATCH -J {title}_anneal23_{i}
+    #SBATCH -o {title}_slurmoutput_anneal23_{i}.out
+    #SBATCH -N 1
+    #SBATCH -n 1
+    #SBATCH --gres=gpu:volta:1
+    export AMBERHOME=/home/gridsan/tjin/amber18
+    source /home/gridsan/tjin/amber18/amber.sh
+    export CUDA_HOME=/usr/local/pkg/cuda/cuda-10.1
+    /home/gridsan/tjin/amber18/bin/pmemd.cuda -O -i {title}_nvt_t1t2_exp_23.in -o {title}_nvt_t1t2_exp_23_{i}.out -p {title}_exp_{i}.parm7 -c {title}_nvt_t1t2_exp_12_{i}.rst -r {title}_nvt_t1t2_exp_23_{i}.rst -x {title}_nvt_t1t2_exp_23_{i}.nc -inf nvtanneal23_{i}inf
+    INPUT\n""")
+
+    # Launch script: launch_anneal34_${i}.sh
+    with open(f"launch_anneal34_{i}.sh", "w") as file:
+        file.write(f"""#!/bin/bash
+    #SBATCH -J {title}_anneal34_{i}
+    #SBATCH -o {title}_slurmoutput_anneal34_{i}.out
+    #SBATCH -N 1
+    #SBATCH -n 1
+    #SBATCH --gres=gpu:volta:1
+    export AMBERHOME=/home/gridsan/tjin/amber18
+    source /home/gridsan/tjin/amber18/amber.sh
+    export CUDA_HOME=/usr/local/pkg/cuda/cuda-10.1
+    /home/gridsan/tjin/amber18/bin/pmemd.cuda -O -i {title}_nvt_t1t2_exp_34.in -o {title}_nvt_t1t2_exp_34_{i}.out -p {title}_exp_{i}.parm7 -c {title}_nvt_t1t2_exp_23_{i}.rst -r {title}_nvt_t1t2_exp_34_{i}.rst -x {title}_nvt_t1t2_exp_34_{i}.nc -inf nvtanneal34_{i}inf
+    INPUT\n""")
+
+    # Launch script: launch_prod_${i}.sh
+    with open(f"launch_prod_{i}.sh", "w") as file:
+        file.write(f"""#!/bin/bash
+    #SBATCH -J {title}_prod_{i}
+    #SBATCH -o {title}_slurmoutput_prod_{i}.out
+    #SBATCH -N 1
+    #SBATCH -n 1
+    #SBATCH --gres=gpu:volta:1
+    export AMBERHOME=/home/gridsan/tjin/amber18
+    source /home/gridsan/tjin/amber18/amber.sh
+    export CUDA_HOME=/usr/local/pkg/cuda/cuda-10.1
+    /home/gridsan/tjin/amber18/bin/pmemd.cuda -O -i {title}_production1_exp.in -o {title}_production1_exp_{i}.out -p {title}_exp_{i}.parm7 -c {title}_nvt_t1t2_exp_34_{i}.rst -r {title}_production1_exp_{i}.rst -x {title}_production1_exp_{i}.nc -inf prod1_{i}inf
+    /home/gridsan/tjin/amber18/bin/pmemd.cuda -O -i {title}_production2_exp.in -o {title}_production2_exp_{i}.out -p {title}_exp_{i}.parm7 -c {title}_production1_exp_{i}.rst -r {title}_production2_exp_{i}.rst -x {title}_production2_exp_{i}.nc -inf prod2_{i}inf
+    INPUT\n""")
+
+    # Launch script: launch_prod3_${i}.sh
+    with open(f"launch_prod3_{i}.sh", "w") as file:
+        file.write(f"""#!/bin/bash
+    #SBATCH -J {title}_prod3_{i}
+    #SBATCH -o {title}_slurmoutput_prod3_{i}.out
+    #SBATCH -N 1
+    #SBATCH -n 1
+    #SBATCH --gres=gpu:volta:1
+    export AMBERHOME=/home/gridsan/tjin/amber18
+    source /home/gridsan/tjin/amber18/amber.sh
+    export CUDA_HOME=/usr/local/pkg/cuda/cuda-10.1
+    /home/gridsan/tjin/amber18/bin/pmemd.cuda -O -i {title}_production2_exp.in -o {title}_production3_exp_{i}.out -p {title}_exp_{i}.parm7 -c {title}_production2_exp_{i}.rst -r {title}_production3_exp_{i}.rst -x {title}_production3_exp_{i}.nc -inf prod3_{i}inf
+    INPUT\n""")
+
+    # sbatch_script.sh
+    with open("sbatch_script.sh", "a") as file:
+        file.write(f"job0=$(sbatch launch_prep_{i}.sh)\n")
+        file.write(f"jid0=$(echo ${{job0}} | awk '{{print $4}}')\n")
+        file.write(f"job1=$(sbatch --dependency=afterok:$jid0 launch_min_{i}.sh)\n")
+        file.write(f"jid1=$(echo ${{job1}} | awk '{{print $4}}')\n")
+
+    # sbatch_script_GPU.sh
+    with open("sbatch_script_GPU.sh", "a") as file:
+        file.write(f"job2=$(sbatch launch_anneal12_{i}.sh)\n")
+        file.write(f"jid2=$(echo ${{job2}} | awk '{{print $4}}')\n")
+        file.write(f"job3=$(sbatch --dependency=afterok:$jid2 launch_anneal23_{i}.sh)\n")
+        file.write(f"jid3=$(echo ${{job3}} | awk '{{print $4}}')\n")
+        file.write(f"job4=$(sbatch --dependency=afterok:$jid3 launch_anneal34_{i}.sh)\n")
+        file.write(f"jid4=$(echo ${{job4}} | awk '{{print $4}}')\n")
+        file.write(f"job5=$(sbatch --dependency=afterok:$jid4 launch_prod_{i}.sh)\n")
+        file.write(f"jid5=$(echo ${{job5}} | awk '{{print $4}}')\n")
+        file.write(f"job6=$(sbatch --dependency=afterok:$jid5 launch_prod3_{i}.sh)\n")
+
+    # Run sbatch_script.sh
+    os.system("bash sbatch_script.sh")
+
+    # Run sbatch_script_GPU.sh
+    os.system("bash sbatch_script_GPU.sh")
